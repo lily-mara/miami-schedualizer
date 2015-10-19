@@ -2,11 +2,10 @@
 from datetime import datetime
 from xml.etree import ElementTree
 import re
+import itertools
 
 import requests
 import grequests
-
-from combinatorics import explode_combos
 
 URL = 'https://ws.muohio.edu'
 DATE_FORMAT = '%Y-%m-%d'
@@ -66,7 +65,7 @@ def generate_schedule_json(schedules):
 
 
 def possible_schedules(courses):
-	return [i for i in explode_combos(courses) if schedule_is_valid(i)]
+	return [i for i in itertools.product(*courses) if schedule_is_valid(i)]
 
 
 def schedule_is_valid(schedule):
