@@ -22,13 +22,13 @@ def _parse_time(time_string):
 
 
 def main():
-	courses = load_courses('CSE385', 'CSE262', 'CSE464', 'CSE465', 'THE123')
+	courses = load_courses(['CSE385', 'CSE262', 'CSE464', 'CSE465', 'THE123'])
 
 	for x in possible_schedules(courses):
 		print(x, schedule_is_valid(x))
 
 
-def load_courses(*course_codes):
+def load_courses(course_codes):
 	req = []
 
 	for i in course_codes:
@@ -42,8 +42,31 @@ def load_courses(*course_codes):
 	return Course.fetch_courses('201620', req)
 
 
+def generate_schedule_json(schedules):
+	sched = []
+	for schedule in schedules:
+		s = []
+		for course in schedule:
+			for course_schedule in course.courseSchedules:
+				s.append({
+					'days': [i for i in course_schedule.days],
+					'courseId': course.courseId,
+					'startDate': course_schedule.startDate,
+					'endDate': course_schedule.endDate,
+					'startTime': course_schedule.startTime,
+					'endTime': course_schedule.endTime,
+					'courseCode': course.courseCode,
+					'instructors': [i.nameDisplayInformal for i in
+						course.instructors],
+				})
+
+		sched.append(s)
+
+	return sched
+
+
 def possible_schedules(courses):
-	return explode_combos(courses)
+	return [i for i in explode_combos(courses) if schedule_is_valid(i)]
 
 
 def schedule_is_valid(schedule):
