@@ -1,9 +1,12 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 from datetime import datetime
 from xml.etree import ElementTree
 import re
 
 import requests
+import grequests
+
+from combinatorics import explode_combos
 
 URL = 'https://ws.muohio.edu'
 DATE_FORMAT = '%Y-%m-%d'
@@ -20,53 +23,42 @@ def _parse_time(time_string):
 
 def main():
 	courses = load_courses('CSE385', 'CSE262', 'CSE464', 'CSE465', 'THE123')
-	print(courses)
-	print(len(courses))
-	print(possible_schedules(courses))
+
+	for x in possible_schedules(courses):
+		print(x, schedule_is_valid(x))
 
 
 def load_courses(*course_codes):
-	courses = {}
+	req = []
 
 	for i in course_codes:
 		t = course_code_to_tuple(i)
-		courses[i] = _fetch_courses({
+		req.append({
 			'courseSubjectCode': t[0],
 			'courseNumber': t[1],
 			'campusCode': 'O'
 		})
 
-	return courses
+	return Course.fetch_courses('201620', req)
 
 
 def possible_schedules(courses):
-	course_list = list(courses.values())
-	next_to_use = [0 for i in course_list]
-	possible = []
+	return explode_combos(courses)
 
-	for index, course in course_list:
-		print(next_to_use[index])
-		schedule = []
-		for specific_class in course:
-			pass
 
-	next_to_use = [0 for i in course_list]
+def schedule_is_valid(schedule):
+	for course_i in schedule:
+		for course_j in [i for i in schedule if i != course_i]:
+			if course_i.conflicts_with(course_j):
+				return False
+
+	return True
 
 
 def course_code_to_tuple(course_code):
 	if course_code[3] == '-':
 		return (course_code[:3], course_code[4:])
 	return (course_code[:3], course_code[3:])
-
-
-def _fetch_courses(params=None):
-	if params is None:
-		params = {}
-
-	course_json = requests.get(URL, params=params).json()
-	courses = [Course(i) for i in course_json['courseSections']]
-
-	return courses
 
 
 class CourseSchedule(object):
@@ -236,7 +228,7 @@ class AcademicTerm(object):
 	@staticmethod
 	def next_n_terms(n):
 		terms = sorted(AcademicTerm._fetch_terms(), key=lambda x: x.termId)
-		terms_to_return = [x for x in terms if x.startDate > datetime.today()][:n]
+		terms_to_return = [x for x in terms if x.startDate > datetime.today().date()][:n]
 
 		return terms_to_return
 
@@ -289,6 +281,12 @@ class Course(object):
 		self._parse_dates()
 		self._parse_number_fields()
 
+		sched = []
+		for i in self.courseSchedules:
+			sched.append(CourseSchedule(i))
+
+		self.courseSchedules = sched
+
 	def _parse_dates(self):
 		self.partOfTermStartDate = _parse_date(self.partOfTermStartDate)
 		self.partOfTermEndDate = _parse_date(self.partOfTermEndDate)
@@ -335,6 +333,9 @@ class Course(object):
 	def __repr__(self):
 		return '<Course: {}>'.format(self.courseCode)
 
+	def __eq__(self, other):
+		return self.courseId == other.courseId
+
 	def conflicts_with(self, other_course):
 		"""
 		Returns True if this course conflicts with the other course. I.E. Both
@@ -356,19 +357,28 @@ class Course(object):
 		False
 		"""
 		return any(i.conflicts_with(j) for j in self.courseSchedules for i in
-			self.courseSchedules)
+			other_course.courseSchedules)
 
 	@staticmethod
 	def fetch_courses(academic_term, params=None):
 		if params is None:
-			params = {}
+			params = [{}]
+
+		if type(params) == dict:
+			params = []
 
 		if type(academic_term) == AcademicTerm:
 			academic_term = academic_term.termId
 
-		url = '{}/courseSectionV2/{}.json'.format(URL, academic_term)
-		course_json = requests.get(url, params=params).json()
-		courses = [Course(i) for i in course_json['courseSections']]
+		req = []
+		for p in params:
+			url = '{}/courseSectionV2/{}.json'.format(URL, academic_term)
+			req.append(grequests.get(url, params=p))
+
+		res = grequests.map(req)
+		courses = []
+		for i in res:
+			courses.append([Course(j) for j in i.json()['courseSections']])
 
 		return courses
 
