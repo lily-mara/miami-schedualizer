@@ -7,3 +7,5 @@ if [ ! -d miami-env ]; then
 else
 	source miami-env/bin/activate
 fi
+
+export MIAMI_DEBUG=true
