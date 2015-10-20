@@ -55,6 +55,7 @@ def generate_schedule_json(schedules):
 					'startTime': course_schedule.startTime,
 					'endTime': course_schedule.endTime,
 					'courseCode': course.courseCode,
+					'courseTitle': course.courseTitle,
 					'instructors': [i.nameDisplayInformal for i in
 						course.instructors],
 				})
